@@ -11,12 +11,19 @@ import Svg, { Polygon } from 'react-native-svg';
 
 const AnimatedPolygon = Animated.createAnimatedComponent(Polygon);
 
+const getWidth = (props) => (
+    props.viewHeight ? props.viewHeight * props.width / props.height : Dimensions.get('window').width
+);
+
+const getHorizontalPadding = (props) => (
+    (Dimensions.get('window').width - getWidth(props)) / 2
+);
+
 class CustomCrop extends Component {
     constructor(props) {
         super(props);
         this.state = {
-            viewHeight:
-                Dimensions.get('window').width * (props.height / props.width),
+            viewHeight: props.viewHeight || Dimensions.get('window').width * (props.height / props.width),
             height: props.height,
             width: props.width,
             image: props.initialImage,
@@ -39,7 +46,7 @@ class CustomCrop extends Component {
                           props.rectangleCoordinates.topRight,
                           true,
                       )
-                    : { x: Dimensions.get('window').width - 100, y: 100 },
+                    : { x: getWidth(props) - 100, y: 100 },
             ),
             bottomLeft: new Animated.ValueXY(
                 props.rectangleCoordinates
@@ -56,21 +63,24 @@ class CustomCrop extends Component {
                           true,
                       )
                     : {
-                          x: Dimensions.get('window').width - 100,
+                          x: getWidth(props) - 100,
                           y: this.state.viewHeight - 100,
                       },
             ),
         };
+        console.log('this.state.topLeft.x._value: ', this.state.topLeft.x._value)
+        const pH = getHorizontalPadding(props);
         this.state = {
             ...this.state,
-            overlayPositions: `${this.state.topLeft.x._value},${
+            overlayPositions: `${this.state.topLeft.x._value - pH},${
                 this.state.topLeft.y._value
-            } ${this.state.topRight.x._value},${this.state.topRight.y._value} ${
-                this.state.bottomRight.x._value
+            } ${this.state.topRight.x._value - pH},${this.state.topRight.y._value} ${
+                this.state.bottomRight.x._value - pH
             },${this.state.bottomRight.y._value} ${
-                this.state.bottomLeft.x._value
+                this.state.bottomLeft.x._value - pH
             },${this.state.bottomLeft.y._value}`,
         };
+        console.log('this.state.overlayPositions: ', this.state.overlayPositions);
 
         this.panResponderTopLeft = this.createPanResponser(this.state.topLeft);
         this.panResponderTopRight = this.createPanResponser(
@@ -120,6 +130,7 @@ class CustomCrop extends Component {
             height: this.state.height,
             width: this.state.width,
         };
+
         NativeModules.CustomCropManager.crop(
             coordinates,
             this.state.image,
@@ -128,20 +139,21 @@ class CustomCrop extends Component {
     }
 
     updateOverlayString() {
+        const pH = getHorizontalPadding(this.props);
         this.setState({
-            overlayPositions: `${this.state.topLeft.x._value},${
+            overlayPositions: `${this.state.topLeft.x._value - pH},${
                 this.state.topLeft.y._value
-            } ${this.state.topRight.x._value},${this.state.topRight.y._value} ${
-                this.state.bottomRight.x._value
+            } ${this.state.topRight.x._value - pH},${this.state.topRight.y._value} ${
+                this.state.bottomRight.x._value - pH
             },${this.state.bottomRight.y._value} ${
-                this.state.bottomLeft.x._value
+                this.state.bottomLeft.x._value - pH
             },${this.state.bottomLeft.y._value}`,
         });
     }
 
     imageCoordinatesToViewCoordinates(corner) {
         return {
-            x: (corner.x * Dimensions.get('window').width) / this.state.width,
+            x: ((corner.x * getWidth(this.props)) / this.state.width) + getHorizontalPadding(this.props),
             y: (corner.y * this.state.viewHeight) / this.state.height,
         };
     }
@@ -149,8 +161,8 @@ class CustomCrop extends Component {
     viewCoordinatesToImageCoordinates(corner) {
         return {
             x:
-                (corner.x._value / Dimensions.get('window').width) *
-                this.state.width,
+                (((corner.x._value - getHorizontalPadding(this.props)) / getWidth(this.props)) *
+                this.state.width),
             y: (corner.y._value / this.state.viewHeight) * this.state.height,
         };
     }
@@ -168,6 +180,7 @@ class CustomCrop extends Component {
                     style={[
                         s(this.props).cropContainer,
                         { height: this.state.viewHeight },
+                        
                     ]}
                 >
                     <Image
@@ -180,8 +193,8 @@ class CustomCrop extends Component {
                     />
                     <Svg
                         height={this.state.viewHeight}
-                        width={Dimensions.get('window').width}
-                        style={{ position: 'absolute', left: 0, top: 0 }}
+                        width={getWidth(this.props)}
+                        style={s(this.props).polygon}
                     >
                         <AnimatedPolygon
                             ref={(ref) => (this.polygon = ref)}
@@ -293,8 +306,8 @@ const s = (props) => ({
         backgroundColor: props.handlerColor || 'blue',
     },
     image: {
-        width: Dimensions.get('window').width,
-        position: 'absolute',
+        width: getWidth(props),
+        ...(!props.viewHeight ? { position: 'absolute' } : {}),
     },
     bottomButton: {
         alignItems: 'center',
@@ -319,7 +332,13 @@ const s = (props) => ({
         left: 0,
         width: Dimensions.get('window').width,
         top: 0,
+        paddingHorizontal: getHorizontalPadding(props),
     },
+    polygon: {
+        position: 'absolute',
+        left: props.viewHeight ? getHorizontalPadding(props) : 0,
+        top: 0,
+    }
 });
 
 export default CustomCrop;
