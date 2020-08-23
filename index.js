@@ -216,12 +216,13 @@ class CustomCrop extends Component {
                             style={[
                                 s(this.props).handlerI,
                                 { left: -10, top: -10 },
+                                s(this.props).handlerTopLeft,
                             ]}
                         />
                         <View
                             style={[
                                 s(this.props).handlerRound,
-                                { left: 31, top: 31 },
+                                { left: 50, top: 50 },
                             ]}
                         />
                     </Animated.View>
@@ -235,13 +236,15 @@ class CustomCrop extends Component {
                         <View
                             style={[
                                 s(this.props).handlerI,
-                                { left: 10, top: -10 },
+                                { left: -30, top: -10 },
+                                s(this.props).handlerTopLeft,
+                                s(this.props).handlerTopRight,
                             ]}
                         />
                         <View
                             style={[
                                 s(this.props).handlerRound,
-                                { right: 31, top: 31 },
+                                { right: 90, top: 50 },
                             ]}
                         />
                     </Animated.View>
@@ -255,13 +258,15 @@ class CustomCrop extends Component {
                         <View
                             style={[
                                 s(this.props).handlerI,
-                                { left: -10, top: 10 },
+                                { left: -10, top: -30 },
+                                s(this.props).handlerTopLeft,
+                                s(this.props).handlerBottomLeft,
                             ]}
                         />
                         <View
                             style={[
                                 s(this.props).handlerRound,
-                                { left: 31, bottom: 31 },
+                                { left: 50, bottom: 90 },
                             ]}
                         />
                     </Animated.View>
@@ -275,13 +280,15 @@ class CustomCrop extends Component {
                         <View
                             style={[
                                 s(this.props).handlerI,
-                                { left: 10, top: 10 },
+                                { left: -30, top: -30 },
+                                s(this.props).handlerTopLeft,
+                                s(this.props).handlerBottomRight,
                             ]}
                         />
                         <View
                             style={[
                                 s(this.props).handlerRound,
-                                { right: 31, bottom: 31 },
+                                { right: 90, bottom: 90 },
                             ]}
                         />
                     </Animated.View>
@@ -298,13 +305,32 @@ const s = (props) => ({
         width: 20,
         backgroundColor: props.handlerColor || 'blue',
     },
-    handlerRound: {
-        width: 39,
-        position: 'absolute',
-        height: 39,
-        borderRadius: 100,
-        backgroundColor: props.handlerColor || 'blue',
+    handlerTopLeft: {
+        width: 0,
+        height: 0,
+        backgroundColor: 'transparent',
+        borderStyle: 'solid',
+        borderRightWidth: 20,
+        borderTopWidth: 20,
+        borderRightColor: 'transparent',
+        borderTopColor: props.handlerColor
     },
+    handlerTopRight: {
+        transform: [
+            {rotate: '90deg'}
+        ]
+    },
+    handlerBottomLeft: {
+        transform: [
+            {rotate: '270deg'}
+        ]
+    },
+    handlerBottomRight: {
+        transform: [
+            {rotate: '180deg'}
+        ]
+    },
+    handlerRound: {},
     image: {
         width: getWidth(props),
         ...(!props.viewHeight ? { position: 'absolute' } : {}),
@@ -321,8 +347,8 @@ const s = (props) => ({
         height: 140,
         width: 140,
         overflow: 'visible',
-        marginLeft: -70,
-        marginTop: -70,
+        marginLeft: -50,
+        marginTop: -50,
         alignItems: 'center',
         justifyContent: 'center',
         position: 'absolute',
