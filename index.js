@@ -6,8 +6,11 @@ import {
     Image,
     View,
     Animated,
+    StatusBar,
 } from 'react-native';
 import Svg, { Polygon } from 'react-native-svg';
+
+const size = Dimensions.get('window');
 
 const AnimatedPolygon = Animated.createAnimatedComponent(Polygon);
 
@@ -23,6 +26,7 @@ class CustomCrop extends Component {
     constructor(props) {
         super(props);
         this.state = {
+            activeMarkers: {},
             viewHeight: props.viewHeight || Dimensions.get('window').width * (props.height / props.width),
             height: props.height,
             width: props.width,
@@ -35,82 +39,111 @@ class CustomCrop extends Component {
             topLeft: new Animated.ValueXY(
                 props.rectangleCoordinates
                     ? this.imageCoordinatesToViewCoordinates(
-                          props.rectangleCoordinates.topLeft,
-                          true,
-                      )
+                        props.rectangleCoordinates.topLeft,
+                        true,
+                    )
                     : { x: 100, y: 100 },
             ),
             topRight: new Animated.ValueXY(
                 props.rectangleCoordinates
                     ? this.imageCoordinatesToViewCoordinates(
-                          props.rectangleCoordinates.topRight,
-                          true,
-                      )
+                        props.rectangleCoordinates.topRight,
+                        true,
+                    )
                     : { x: getWidth(props) - 100, y: 100 },
             ),
             bottomLeft: new Animated.ValueXY(
                 props.rectangleCoordinates
                     ? this.imageCoordinatesToViewCoordinates(
-                          props.rectangleCoordinates.bottomLeft,
-                          true,
-                      )
+                        props.rectangleCoordinates.bottomLeft,
+                        true,
+                    )
                     : { x: 100, y: this.state.viewHeight - 100 },
             ),
             bottomRight: new Animated.ValueXY(
                 props.rectangleCoordinates
                     ? this.imageCoordinatesToViewCoordinates(
-                          props.rectangleCoordinates.bottomRight,
-                          true,
-                      )
+                        props.rectangleCoordinates.bottomRight,
+                        true,
+                    )
                     : {
-                          x: getWidth(props) - 100,
-                          y: this.state.viewHeight - 100,
-                      },
+                        x: getWidth(props) - 100,
+                        y: this.state.viewHeight - 100,
+                    },
             ),
         };
-        console.log('this.state.topLeft.x._value: ', this.state.topLeft.x._value)
         const pH = getHorizontalPadding(props);
         this.state = {
             ...this.state,
             overlayPositions: `${this.state.topLeft.x._value - pH},${
                 this.state.topLeft.y._value
-            } ${this.state.topRight.x._value - pH},${this.state.topRight.y._value} ${
+                } ${this.state.topRight.x._value - pH},${this.state.topRight.y._value} ${
                 this.state.bottomRight.x._value - pH
-            },${this.state.bottomRight.y._value} ${
+                },${this.state.bottomRight.y._value} ${
                 this.state.bottomLeft.x._value - pH
-            },${this.state.bottomLeft.y._value}`,
+                },${this.state.bottomLeft.y._value}`,
         };
-        console.log('this.state.overlayPositions: ', this.state.overlayPositions);
 
-        this.panResponderTopLeft = this.createPanResponser(this.state.topLeft);
+        this.panResponderTopLeft = this.createPanResponser(this.state.topLeft, 'topLeft');
         this.panResponderTopRight = this.createPanResponser(
-            this.state.topRight,
+            this.state.topRight, 'topRight'
         );
         this.panResponderBottomLeft = this.createPanResponser(
-            this.state.bottomLeft,
+            this.state.bottomLeft, 'bottomLeft'
         );
         this.panResponderBottomRight = this.createPanResponser(
-            this.state.bottomRight,
+            this.state.bottomRight, 'bottomRight'
         );
     }
 
-    createPanResponser(corner) {
+    createPanResponser(corner, type) {
+        let offset = { x: 0, y: 0 };
         return PanResponder.create({
             onStartShouldSetPanResponder: () => true,
-            onPanResponderMove: Animated.event([
-                null,
-                {
-                    dx: corner.x,
-                    dy: corner.y,
-                },
-            ]),
+            onPanResponderMove: (event, gestureEvent) => {
+                const horizontallyOK = (
+                    event.nativeEvent.pageX > 0 + 20
+                    && event.nativeEvent.pageX < size.width - 20
+                );
+                const diff = size.height - this.state.viewHeight;
+                const verticallyOK = (
+                    event.nativeEvent.pageY > diff
+                    && event.nativeEvent.pageY < this.state.viewHeight + (StatusBar.currentHeight || 0)
+                );
+                if (verticallyOK && horizontallyOK) {
+                    corner.x.setValue(gestureEvent.dx);
+                    corner.y.setValue(gestureEvent.dy);
+                    this.moveOverlayString(type, {
+                        x: {
+                            _value: gestureEvent.dx + offset.x
+                        },
+                        y: {
+                            _value: gestureEvent.dy + offset.y
+                        },
+                    })
+
+                }
+            },
             onPanResponderRelease: () => {
                 corner.flattenOffset();
                 this.updateOverlayString();
+                this.setState(prevState => ({
+                    activeMarkers: {
+                        ...prevState.activeMarkers,
+                        [type]: false
+                    }
+                }));
             },
             onPanResponderGrant: () => {
                 corner.setOffset({ x: corner.x._value, y: corner.y._value });
+                offset = { x: corner.x._value, y: corner.y._value };
                 corner.setValue({ x: 0, y: 0 });
+                this.setState(prevState => ({
+                    activeMarkers: {
+                        ...prevState.activeMarkers,
+                        [type]: true
+                    }
+                }));
             },
         });
     }
@@ -143,11 +176,30 @@ class CustomCrop extends Component {
         this.setState({
             overlayPositions: `${this.state.topLeft.x._value - pH},${
                 this.state.topLeft.y._value
-            } ${this.state.topRight.x._value - pH},${this.state.topRight.y._value} ${
+                } ${this.state.topRight.x._value - pH},${this.state.topRight.y._value} ${
                 this.state.bottomRight.x._value - pH
-            },${this.state.bottomRight.y._value} ${
+                },${this.state.bottomRight.y._value} ${
                 this.state.bottomLeft.x._value - pH
-            },${this.state.bottomLeft.y._value}`,
+                },${this.state.bottomLeft.y._value}`,
+        });
+    }
+
+    moveOverlayString(key, value) {
+        const state = {
+            topLeft: key === 'topLeft' ? value : this.state.topLeft,
+            topRight: key === 'topRight' ? value : this.state.topRight,
+            bottomLeft: key === 'bottomLeft' ? value : this.state.bottomLeft,
+            bottomRight: key === 'bottomRight' ? value : this.state.bottomRight,
+        };
+        const pH = getHorizontalPadding(this.props);
+        this.setState({
+            overlayPositions: `${state.topLeft.x._value - pH},${
+                state.topLeft.y._value
+                } ${state.topRight.x._value - pH},${state.topRight.y._value} ${
+                state.bottomRight.x._value - pH
+                },${state.bottomRight.y._value} ${
+                state.bottomLeft.x._value - pH
+                },${state.bottomLeft.y._value}`,
         });
     }
 
@@ -162,7 +214,7 @@ class CustomCrop extends Component {
         return {
             x:
                 (((corner.x._value - getHorizontalPadding(this.props)) / getWidth(this.props)) *
-                this.state.width),
+                    this.state.width),
             y: (corner.y._value / this.state.viewHeight) * this.state.height,
         };
     }
@@ -180,7 +232,7 @@ class CustomCrop extends Component {
                     style={[
                         s(this.props).cropContainer,
                         { height: this.state.viewHeight },
-                        
+
                     ]}
                 >
                     <Image
@@ -217,6 +269,7 @@ class CustomCrop extends Component {
                                 s(this.props).handlerI,
                                 { left: -10, top: -10 },
                                 s(this.props).handlerTopLeft,
+                                this.state.activeMarkers.topLeft ? s(this.props).activeHandler : null,
                             ]}
                         />
                         <View
@@ -239,6 +292,7 @@ class CustomCrop extends Component {
                                 { left: -30, top: -10 },
                                 s(this.props).handlerTopLeft,
                                 s(this.props).handlerTopRight,
+                                this.state.activeMarkers.topRight ? s(this.props).activeHandler : null,
                             ]}
                         />
                         <View
@@ -261,6 +315,7 @@ class CustomCrop extends Component {
                                 { left: -10, top: -30 },
                                 s(this.props).handlerTopLeft,
                                 s(this.props).handlerBottomLeft,
+                                this.state.activeMarkers.bottomLeft ? s(this.props).activeHandler : null,
                             ]}
                         />
                         <View
@@ -283,6 +338,7 @@ class CustomCrop extends Component {
                                 { left: -30, top: -30 },
                                 s(this.props).handlerTopLeft,
                                 s(this.props).handlerBottomRight,
+                                this.state.activeMarkers.bottomRight ? s(this.props).activeHandler : null,
                             ]}
                         />
                         <View
@@ -317,18 +373,22 @@ const s = (props) => ({
     },
     handlerTopRight: {
         transform: [
-            {rotate: '90deg'}
+            { rotate: '90deg' }
         ]
     },
     handlerBottomLeft: {
         transform: [
-            {rotate: '270deg'}
+            { rotate: '270deg' }
         ]
     },
     handlerBottomRight: {
         transform: [
-            {rotate: '180deg'}
+            { rotate: '180deg' }
         ]
+    },
+    activeHandler: {
+        borderRightWidth: 50,
+        borderTopWidth: 50,
     },
     handlerRound: {},
     image: {
