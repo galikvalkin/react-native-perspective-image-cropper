@@ -6,11 +6,11 @@ import {
     Image,
     View,
     Animated,
-    StatusBar,
+    Platform,
 } from 'react-native';
 import Svg, { Polygon } from 'react-native-svg';
 
-const size = Dimensions.get('window');
+const screen = Dimensions.get('screen');
 
 const AnimatedPolygon = Animated.createAnimatedComponent(Polygon);
 
@@ -22,6 +22,8 @@ const getHorizontalPadding = (props) => (
     (Dimensions.get('window').width - getWidth(props)) / 2
 );
 
+const TOUCHABLE_HEIGHT = 40;
+
 class CustomCrop extends Component {
     constructor(props) {
         super(props);
@@ -32,6 +34,7 @@ class CustomCrop extends Component {
             width: props.width,
             image: props.initialImage,
             moving: false,
+            screenHeight: 0,
         };
 
         this.state = {
@@ -101,14 +104,24 @@ class CustomCrop extends Component {
         return PanResponder.create({
             onStartShouldSetPanResponder: () => true,
             onPanResponderMove: (event, gestureEvent) => {
+                const isInRange = event.nativeEvent.locationY >= 0 && event.nativeEvent.locationY <= TOUCHABLE_HEIGHT;
+                const newX = event.nativeEvent.pageX;
+                const newY = event.nativeEvent.pageY;
                 const horizontallyOK = (
-                    event.nativeEvent.pageX > 0 + 20
-                    && event.nativeEvent.pageX < size.width - 20
+                    newX > 6
+                    && newX < screen.width - 6
                 );
-                const diff = size.height - this.state.viewHeight;
+                const headerHeight = this.props.headerHeight;
+                const bottomY = (Platform.select({
+                    ios: this.state.viewHeight,
+                    android: this.state.screenHeight
+                }) + headerHeight);
+                const topY = headerHeight;
+                const topNewY = newY - (isInRange ? event.nativeEvent.locationY : 0);
+                const bottomNewY = newY + (isInRange ? 40 - event.nativeEvent.locationY : 0);
                 const verticallyOK = (
-                    event.nativeEvent.pageY > diff
-                    && event.nativeEvent.pageY < this.state.viewHeight + (StatusBar.currentHeight || 0)
+                    topNewY >= topY
+                    && bottomNewY < bottomY
                 );
                 if (verticallyOK && horizontallyOK) {
                     corner.x.setValue(gestureEvent.dx);
@@ -222,6 +235,11 @@ class CustomCrop extends Component {
     render() {
         return (
             <View
+                onLayout={event => {
+                    this.setState({
+                        screenHeight: event.nativeEvent.layout.height,
+                    });
+                }}
                 style={{
                     flex: 1,
                     alignItems: 'center',
@@ -262,6 +280,8 @@ class CustomCrop extends Component {
                         style={[
                             this.state.topLeft.getLayout(),
                             s(this.props).handler,
+                            { marginLeft: 0, marginTop: 0 },
+
                         ]}
                     >
                         <View
@@ -270,6 +290,7 @@ class CustomCrop extends Component {
                                 { left: -10, top: -10 },
                                 s(this.props).handlerTopLeft,
                                 this.state.activeMarkers.topLeft ? s(this.props).activeHandler : null,
+                                this.state.activeMarkers.topLeft ? { left: 5, top: 5 } : null,
                             ]}
                         />
                         <View
@@ -284,15 +305,17 @@ class CustomCrop extends Component {
                         style={[
                             this.state.topRight.getLayout(),
                             s(this.props).handler,
+                            { marginLeft: -40, marginTop: 0 },
                         ]}
                     >
                         <View
                             style={[
                                 s(this.props).handlerI,
-                                { left: -30, top: -10 },
+                                { left: 10, top: -10 },
                                 s(this.props).handlerTopLeft,
                                 s(this.props).handlerTopRight,
                                 this.state.activeMarkers.topRight ? s(this.props).activeHandler : null,
+                                this.state.activeMarkers.topRight ? { left: -5, top: 5 } : null,
                             ]}
                         />
                         <View
@@ -307,15 +330,17 @@ class CustomCrop extends Component {
                         style={[
                             this.state.bottomLeft.getLayout(),
                             s(this.props).handler,
+                            { marginLeft: 0, marginTop: -40 },
                         ]}
                     >
                         <View
                             style={[
                                 s(this.props).handlerI,
-                                { left: -10, top: -30 },
+                                { left: -10, top: 10 },
                                 s(this.props).handlerTopLeft,
                                 s(this.props).handlerBottomLeft,
                                 this.state.activeMarkers.bottomLeft ? s(this.props).activeHandler : null,
+                                this.state.activeMarkers.bottomLeft ? { left: 5, top: -5 } : null,
                             ]}
                         />
                         <View
@@ -330,15 +355,17 @@ class CustomCrop extends Component {
                         style={[
                             this.state.bottomRight.getLayout(),
                             s(this.props).handler,
+                            { marginLeft: -40, marginTop: -40 },
                         ]}
                     >
                         <View
                             style={[
                                 s(this.props).handlerI,
-                                { left: -30, top: -30 },
+                                { left: 10, top: 10 },
                                 s(this.props).handlerTopLeft,
                                 s(this.props).handlerBottomRight,
                                 this.state.activeMarkers.bottomRight ? s(this.props).activeHandler : null,
+                                this.state.activeMarkers.bottomRight ? { left: -5, top: -5 } : null,
                             ]}
                         />
                         <View
@@ -404,11 +431,9 @@ const s = (props) => ({
         borderRadius: 100,
     },
     handler: {
-        height: 140,
-        width: 140,
+        height: TOUCHABLE_HEIGHT,
+        width: TOUCHABLE_HEIGHT,
         overflow: 'visible',
-        marginLeft: -50,
-        marginTop: -50,
         alignItems: 'center',
         justifyContent: 'center',
         position: 'absolute',
