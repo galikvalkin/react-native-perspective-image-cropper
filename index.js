@@ -7,6 +7,7 @@ import {
     View,
     Animated,
     Platform,
+    ImageStyle,
 } from 'react-native';
 import Svg, { Polygon } from 'react-native-svg';
 
@@ -24,6 +25,55 @@ const getHorizontalPadding = (props) => (
 
 const TOUCHABLE_HEIGHT = 40;
 
+const MagnifyingGlass = (props) => (
+    <View
+        style={[
+            {
+                backgroundColor: 'white',
+                position: 'absolute',
+                bottom: 100,
+                right: 0,
+                width: props.blockSize,
+                height: props.blockSize,
+                overflow: 'hidden',
+                borderRadius: props.blockSize / 2,
+            },
+            props.containerStyle
+        ]}>
+        <Image
+            style={[
+                props.imageStyle,
+                { height: props.imageHeight },
+                { position: 'absolute', top: 0, left: 0, },
+                {
+                    top: props.positionTop,
+                    left: props.positionLeft,
+                }
+            ]}
+            resizeMode="contain"
+            source={{ uri: props.imageUri }}
+        />
+        <View
+            style={[
+                s({}).magnifyingGlassVerticalLine,
+                {
+                    top: (props.blockSize - 50) / 2,
+                    left: (props.blockSize - 1) / 2,
+                }
+            ]}
+        />
+        <View
+            style={[
+                s({}).magnifyingGlassHorizontalLine,
+                {
+                    top: (props.blockSize - 1) / 2,
+                    left: (props.blockSize - 50) / 2,
+                }
+            ]}
+        />
+    </View>
+)
+
 class CustomCrop extends Component {
     constructor(props) {
         super(props);
@@ -35,6 +85,30 @@ class CustomCrop extends Component {
             image: props.initialImage,
             moving: false,
             screenHeight: 0,
+            magnifyingGlassCoords: {
+                topLeft: {
+                    x: 0,
+                    y: 0,
+                },
+                topRight: {
+                    x: 0,
+                    y: 0,
+                },
+                bottomLeft: {
+                    x: 0,
+                    y: 0,
+                },
+                bottomRight: {
+                    x: 0,
+                    y: 0,
+                },
+            },
+            showMagnifyingGlass: {
+                topLeft: false,
+                topRight: false,
+                bottomLeft: false,
+                bottomRight: false,
+            }
         };
 
         this.state = {
@@ -78,12 +152,9 @@ class CustomCrop extends Component {
         const pH = getHorizontalPadding(props);
         this.state = {
             ...this.state,
-            overlayPositions: `${this.state.topLeft.x._value - pH},${
-                this.state.topLeft.y._value
-                } ${this.state.topRight.x._value - pH},${this.state.topRight.y._value} ${
-                this.state.bottomRight.x._value - pH
-                },${this.state.bottomRight.y._value} ${
-                this.state.bottomLeft.x._value - pH
+            overlayPositions: `${this.state.topLeft.x._value - pH},${this.state.topLeft.y._value
+                } ${this.state.topRight.x._value - pH},${this.state.topRight.y._value} ${this.state.bottomRight.x._value - pH
+                },${this.state.bottomRight.y._value} ${this.state.bottomLeft.x._value - pH
                 },${this.state.bottomLeft.y._value}`,
         };
 
@@ -144,6 +215,10 @@ class CustomCrop extends Component {
                     activeMarkers: {
                         ...prevState.activeMarkers,
                         [type]: false
+                    },
+                    showMagnifyingGlass: {
+                        ...prevState.showMagnifyingGlass,
+                        [type]: false
                     }
                 }));
             },
@@ -154,6 +229,10 @@ class CustomCrop extends Component {
                 this.setState(prevState => ({
                     activeMarkers: {
                         ...prevState.activeMarkers,
+                        [type]: true
+                    },
+                    showMagnifyingGlass: {
+                        ...prevState.showMagnifyingGlass,
                         [type]: true
                     }
                 }));
@@ -187,12 +266,9 @@ class CustomCrop extends Component {
     updateOverlayString() {
         const pH = getHorizontalPadding(this.props);
         this.setState({
-            overlayPositions: `${this.state.topLeft.x._value - pH},${
-                this.state.topLeft.y._value
-                } ${this.state.topRight.x._value - pH},${this.state.topRight.y._value} ${
-                this.state.bottomRight.x._value - pH
-                },${this.state.bottomRight.y._value} ${
-                this.state.bottomLeft.x._value - pH
+            overlayPositions: `${this.state.topLeft.x._value - pH},${this.state.topLeft.y._value
+                } ${this.state.topRight.x._value - pH},${this.state.topRight.y._value} ${this.state.bottomRight.x._value - pH
+                },${this.state.bottomRight.y._value} ${this.state.bottomLeft.x._value - pH
                 },${this.state.bottomLeft.y._value}`,
         });
     }
@@ -205,15 +281,19 @@ class CustomCrop extends Component {
             bottomRight: key === 'bottomRight' ? value : this.state.bottomRight,
         };
         const pH = getHorizontalPadding(this.props);
-        this.setState({
-            overlayPositions: `${state.topLeft.x._value - pH},${
-                state.topLeft.y._value
-                } ${state.topRight.x._value - pH},${state.topRight.y._value} ${
-                state.bottomRight.x._value - pH
-                },${state.bottomRight.y._value} ${
-                state.bottomLeft.x._value - pH
+        this.setState((prevState) => ({
+            overlayPositions: `${state.topLeft.x._value - pH},${state.topLeft.y._value
+                } ${state.topRight.x._value - pH},${state.topRight.y._value} ${state.bottomRight.x._value - pH
+                },${state.bottomRight.y._value} ${state.bottomLeft.x._value - pH
                 },${state.bottomLeft.y._value}`,
-        });
+            magnifyingGlassCoords: {
+                ...prevState.magnifyingGlassCoords,
+                [key]: {
+                    x: state[key].x._value,
+                    y: state[key].y._value,
+                }
+            }
+        }));
     }
 
     imageCoordinatesToViewCoordinates(corner) {
@@ -232,7 +312,27 @@ class CustomCrop extends Component {
         };
     }
 
+
+
     render() {
+        const containerWidth = s(this.props).cropContainer.width;
+        const imageWidth = s(this.props).image.width;
+
+        const imagePadding = (containerWidth - imageWidth) / 2;
+
+        const topLeftImageCoords = this.viewCoordinatesToImageCoordinates(this.state.topLeft);
+        const topLeftViewCoords = this.imageCoordinatesToViewCoordinates(topLeftImageCoords);
+
+        const topRightImageCoords = this.viewCoordinatesToImageCoordinates(this.state.topRight);
+        const topRightViewCoords = this.imageCoordinatesToViewCoordinates(topRightImageCoords);
+
+        const bottomLeftImageCoords = this.viewCoordinatesToImageCoordinates(this.state.bottomLeft);
+        const bottomLeftViewCoords = this.imageCoordinatesToViewCoordinates(bottomLeftImageCoords);
+
+        const bottomRightImageCoords = this.viewCoordinatesToImageCoordinates(this.state.bottomRight);
+        const bottomRightViewCoords = this.imageCoordinatesToViewCoordinates(bottomRightImageCoords);
+
+        const blockSize = 100;
         return (
             <View
                 onLayout={event => {
@@ -375,6 +475,62 @@ class CustomCrop extends Component {
                             ]}
                         />
                     </Animated.View>
+                    {this.state.showMagnifyingGlass.bottomLeft && (
+                        <MagnifyingGlass
+                            containerStyle={{
+                                top: 100,
+                                left: 0,
+                            }}
+                            imageStyle={s(this.props).image}
+                            blockSize={blockSize}
+                            imageHeight={this.state.viewHeight}
+                            imageUri={this.state.image}
+                            positionTop={-this.state.magnifyingGlassCoords.bottomLeft.y + blockSize / 2}
+                            positionLeft={-this.state.magnifyingGlassCoords.bottomLeft.x + (imagePadding) + blockSize / 2}
+                        />
+                    )}
+                    {this.state.showMagnifyingGlass.bottomRight && (
+                        <MagnifyingGlass
+                            containerStyle={{
+                                top: 100,
+                                right: 0,
+                            }}
+                            imageStyle={s(this.props).image}
+                            blockSize={blockSize}
+                            imageHeight={this.state.viewHeight}
+                            imageUri={this.state.image}
+                            positionTop={-this.state.magnifyingGlassCoords.bottomRight.y + blockSize / 2}
+                            positionLeft={-this.state.magnifyingGlassCoords.bottomRight.x + (imagePadding) + blockSize / 2}
+                        />
+                    )}
+                    {this.state.showMagnifyingGlass.topLeft && (
+                        <MagnifyingGlass
+                            containerStyle={{
+                                bottom: 100,
+                                left: 0,
+                            }}
+                            imageStyle={s(this.props).image}
+                            blockSize={blockSize}
+                            imageHeight={this.state.viewHeight}
+                            imageUri={this.state.image}
+                            positionTop={-this.state.magnifyingGlassCoords.topLeft.y + blockSize / 2}
+                            positionLeft={-this.state.magnifyingGlassCoords.topLeft.x + (imagePadding) + blockSize / 2}
+                        />
+                    )}
+                    {this.state.showMagnifyingGlass.topRight && (
+                        <MagnifyingGlass
+                            containerStyle={{
+                                bottom: 100,
+                                right: 0,
+                            }}
+                            imageStyle={s(this.props).image}
+                            blockSize={blockSize}
+                            imageHeight={this.state.viewHeight}
+                            imageUri={this.state.image}
+                            positionTop={-this.state.magnifyingGlassCoords.topRight.y + blockSize / 2}
+                            positionLeft={-this.state.magnifyingGlassCoords.topRight.x + (imagePadding) + blockSize / 2}
+                        />
+                    )}
                 </View>
             </View>
         );
@@ -382,6 +538,18 @@ class CustomCrop extends Component {
 }
 
 const s = (props) => ({
+    magnifyingGlassHorizontalLine: {
+        position: 'absolute',
+        width: 50,
+        height: 1,
+        backgroundColor: 'black'
+    },
+    magnifyingGlassVerticalLine: {
+        position: 'absolute',
+        width: 1,
+        height: 50,
+        backgroundColor: 'black'
+    },
     handlerI: {
         borderRadius: 0,
         height: 20,
